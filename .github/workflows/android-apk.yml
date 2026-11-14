@@ -3,6 +3,8 @@ name: Build Android APK
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - "v*"
 
@@ -13,7 +15,23 @@ jobs:
   apk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Get the Android changes (this repo)
+        uses: actions/checkout@v4
+        with:
+          path: overlay
+
+      - name: Get the original iHatePDF project
+        uses: actions/checkout@v4
+        with:
+          repository: cu-sanjay/iHatePDF
+          ref: 29eb82110f22f97e6a22253412c640ee9f1813a5
+          path: app
+
+      - name: Apply the Android changes
+        run: |
+          cp overlay/package.json app/package.json
+          cp overlay/capacitor.config.ts app/capacitor.config.ts
+          cp overlay/client/src/lib/fileUtils.ts app/client/src/lib/fileUtils.ts
 
       - uses: actions/setup-node@v4
         with:
@@ -25,24 +43,25 @@ jobs:
           java-version: 21
 
       - name: Install dependencies
+        working-directory: app
         run: npm install --no-audit --no-fund
 
       - name: Build web app
+        working-directory: app
         run: npx vite build
 
       - name: Create Android project
+        working-directory: app
         run: |
-          if [ ! -d android ]; then
-            npx cap add android
-          fi
+          npx cap add android
           npx cap sync android
 
       - name: Build APK
-        working-directory: android
+        working-directory: app/android
         run: ./gradlew assembleDebug --no-daemon
 
       - name: Name the APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk iHatePDF.apk
+        run: cp app/android/app/build/outputs/apk/debug/app-debug.apk iHatePDF.apk
 
       - uses: actions/upload-artifact@v4
         with:
